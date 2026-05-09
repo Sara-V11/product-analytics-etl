@@ -236,7 +236,7 @@ Running against a local Postgres container keeps the iteration loop fast and fre
 
 ## Author
 
-[Your name] — [LinkedIn](#) — [GitHub](#)
+[Sara]
 
 ---
 
