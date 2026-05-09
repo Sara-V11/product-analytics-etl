@@ -1,0 +1,26 @@
+# Copy this to ~/.dbt/profiles.yml (or set DBT_PROFILES_DIR)
+# Two targets: 'dev' uses Postgres, 'prod' uses BigQuery.
+
+product_analytics:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('POSTGRES_HOST', 'localhost') }}"
+      port: "{{ env_var('POSTGRES_PORT', 5432) | int }}"
+      user: "{{ env_var('POSTGRES_USER', 'analytics_user') }}"
+      password: "{{ env_var('POSTGRES_PASSWORD') }}"
+      dbname: "{{ env_var('POSTGRES_DB', 'analytics') }}"
+      schema: public
+      threads: 4
+
+    prod:
+      type: bigquery
+      method: service-account
+      project: "{{ env_var('GCP_PROJECT_ID') }}"
+      dataset: "{{ env_var('BQ_DATASET', 'product_analytics') }}"
+      keyfile: "{{ env_var('GOOGLE_APPLICATION_CREDENTIALS') }}"
+      threads: 4
+      timeout_seconds: 300
+      location: US
+      priority: interactive

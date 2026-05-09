@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Env / secrets
+.env
+secrets/
+*.json
+!dbt/**/*.json
+
+# Data (too large for git)
+data/*.csv
+data/*.parquet
+
+# dbt
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+
+# Airflow
+logs/
+airflow.db
+airflow.cfg
+
+# OS
+.DS_Store

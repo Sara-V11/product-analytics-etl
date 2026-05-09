@@ -1,0 +1,46 @@
+version: 2
+
+models:
+  - name: stg_events
+    description: "Cleaned event-level data."
+    columns:
+      - name: user_id
+        tests: [not_null]
+      - name: event_type
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['view', 'cart', 'purchase']
+      - name: event_at
+        tests: [not_null]
+
+  - name: sessions
+    description: "Sessionized user activity (30-min inactivity rule)."
+    columns:
+      - name: session_key
+        tests: [unique, not_null]
+      - name: user_id
+        tests: [not_null]
+
+  - name: funnel
+    description: "Funnel stage counts and conversion rates."
+    columns:
+      - name: stage
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['view', 'cart', 'purchase']
+
+  - name: cohort
+    description: "User → acquisition cohort mapping."
+    columns:
+      - name: user_id
+        tests: [unique, not_null]
+
+  - name: retention
+    description: "Weekly cohort retention matrix."
+    columns:
+      - name: cohort_week
+        tests: [not_null]
+      - name: week_number
+        tests: [not_null]

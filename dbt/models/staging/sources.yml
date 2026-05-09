@@ -1,0 +1,19 @@
+version: 2
+
+sources:
+  - name: raw
+    description: "Raw events ingested from Kaggle CSV via Python."
+    schema: public
+    tables:
+      - name: events_raw
+        description: "Append-only raw clickstream events."
+        columns:
+          - name: user_id
+            tests: [not_null]
+          - name: event_type
+            tests:
+              - not_null
+              - accepted_values:
+                  values: ['view', 'cart', 'purchase']
+          - name: event_time
+            tests: [not_null]
