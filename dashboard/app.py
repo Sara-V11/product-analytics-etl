@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 from datetime import datetime
+from pathlib import Path
 
 import pandas as pd
 import plotly.express as px
@@ -161,7 +162,12 @@ html, body, [class*="css"] {
 </style>
 """, unsafe_allow_html=True)
 
-# ── Connection ────────────────────────────────────────────────────────────────
+# ── Data source ───────────────────────────────────────────────────────────────
+# When POSTGRES_HOST is set (Docker / local dev) queries run against the live DB.
+# On Streamlit Cloud (no DB), the app falls back to parquet snapshots in data/.
+USE_LIVE_DB = bool(os.getenv("POSTGRES_HOST"))
+DATA_DIR    = Path(__file__).parent / "data"
+
 DATABASE_URL = (
     f"postgresql+psycopg2://"
     f"{os.getenv('POSTGRES_USER',     'analytics_user')}:"
@@ -182,6 +188,17 @@ def get_engine():
 @st.cache_data(ttl=600)
 def q(sql: str) -> pd.DataFrame:
     return pd.read_sql(text(sql), get_engine())
+
+
+def load(name: str, sql: str) -> pd.DataFrame:
+    """Query live DB or fall back to parquet snapshot."""
+    if USE_LIVE_DB:
+        return q(sql)
+    path = DATA_DIR / f"{name}.parquet"
+    if not path.exists():
+        st.error(f"Parquet snapshot not found: {path.name}. Run dashboard/data_export.py first.")
+        st.stop()
+    return pd.read_parquet(path)
 
 
 # ── Shared Plotly theme ───────────────────────────────────────────────────────
@@ -243,17 +260,25 @@ def fmt_money(n: float) -> str:
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE HEADER
 # ══════════════════════════════════════════════════════════════════════════════
+_mode_badge = (
+    '<span style="background:#dcfce7;color:#166534;font-size:11px;font-weight:600;'
+    'padding:2px 8px;border-radius:9999px;letter-spacing:0.04em;">Live DB</span>'
+    if USE_LIVE_DB else
+    '<span style="background:#f1f5f9;color:#64748b;font-size:11px;font-weight:600;'
+    'padding:2px 8px;border-radius:9999px;letter-spacing:0.04em;">Demo mode</span>'
+)
 st.markdown(
     '<p style="font-size:2.25rem;font-weight:700;color:#0f172a;line-height:1.1;'
     'letter-spacing:-0.02em;margin:0 0 4px 0;">Product Analytics</p>'
-    '<p style="font-size:14px;font-weight:400;color:#64748b;margin:0 0 1.75rem 0;">'
-    'REES46 eCommerce &nbsp;·&nbsp; November 2019 &nbsp;·&nbsp; 5% user sample'
-    '</p>',
+    f'<p style="font-size:14px;font-weight:400;color:#64748b;margin:0 0 1.75rem 0;">'
+    f'REES46 eCommerce &nbsp;·&nbsp; November 2019 &nbsp;·&nbsp; 5% user sample'
+    f'&nbsp;&nbsp;{_mode_badge}'
+    f'</p>',
     unsafe_allow_html=True,
 )
 
 # ── KPI data ──────────────────────────────────────────────────────────────────
-kpi = q(f"""
+kpi = load("kpi_summary", f"""
     SELECT
         COUNT(DISTINCT user_id)                                          AS users,
         COUNT(DISTINCT session_id)                                       AS sessions,
@@ -328,7 +353,7 @@ tab_funnel, tab_retention, tab_activity, tab_categories = st.tabs(
 # FUNNEL
 # ─────────────────────────────────────────────────────────────────────────────
 with tab_funnel:
-    funnel = q(f"""
+    funnel = load("funnel", f"""
         SELECT stage, stage_order, users, pct_of_top, pct_of_prev
         FROM {MARTS}.funnel ORDER BY stage_order
     """)
@@ -391,7 +416,7 @@ with tab_funnel:
 # RETENTION
 # ─────────────────────────────────────────────────────────────────────────────
 with tab_retention:
-    matrix = q(f"""
+    matrix = load("retention", f"""
         SELECT cohort_week, week_number, retention_rate, cohort_users
         FROM {MARTS}.retention
         ORDER BY cohort_week, week_number
@@ -464,7 +489,7 @@ with tab_retention:
 # DAILY ACTIVITY
 # ─────────────────────────────────────────────────────────────────────────────
 with tab_activity:
-    daily = q(f"""
+    daily = load("daily_activity", f"""
         SELECT DATE_TRUNC('day', event_at)::date AS day,
                COUNT(DISTINCT user_id)            AS dau,
                COUNT(DISTINCT CASE WHEN event_type='purchase' THEN user_id END) AS buyers,
@@ -531,7 +556,7 @@ with tab_activity:
 # CATEGORIES
 # ─────────────────────────────────────────────────────────────────────────────
 with tab_categories:
-    top = q(f"""
+    top = load("top_categories", f"""
         SELECT COALESCE(category_code, 'unknown') AS category,
                COUNT(*)                            AS purchases,
                SUM(price)                          AS revenue,
